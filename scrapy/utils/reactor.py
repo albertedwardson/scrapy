@@ -113,6 +113,9 @@ def _get_asyncio_event_loop() -> AbstractEventLoop:
     return set_asyncio_event_loop(None)
 
 
+def _new_event_loop() -> AbstractEventLoop:
+    return asyncio.SelectorEventLoop() if sys.platform == "win32" else asyncio.new_event_loop()
+
 def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
     """Sets and returns the event loop with specified import path."""
     if event_loop_path is not None:
@@ -134,19 +137,13 @@ def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
                     message="There is no current event loop",
                     category=DeprecationWarning,
                 )
-                event_loop = asyncio.get_event_loop()
+                event_loop = _new_event_loop()
         except RuntimeError:
             # `get_event_loop` raises RuntimeError when called with no asyncio
             # event loop yet installed in the following scenarios:
             # - Previsibly on Python 3.14 and later.
             #   https://github.com/python/cpython/issues/100160#issuecomment-1345581902
-            event_loop = asyncio.new_event_loop()
-
-    if sys.platform == "win32" and not isinstance(
-        event_loop, asyncio.SelectorEventLoop
-    ):
-        # Required by twisted on windows
-        event_loop = asyncio.SelectorEventLoop()
+            event_loop = _new_event_loop()
 
     asyncio.set_event_loop(event_loop)
 
