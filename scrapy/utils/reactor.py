@@ -120,7 +120,6 @@ def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
         event_loop = _get_asyncio_event_loop()
         if not isinstance(event_loop, event_loop_class):
             event_loop = event_loop_class()
-            asyncio.set_event_loop(event_loop)
     else:
         try:
             with catch_warnings():
@@ -142,7 +141,15 @@ def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
             # - Previsibly on Python 3.14 and later.
             #   https://github.com/python/cpython/issues/100160#issuecomment-1345581902
             event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(event_loop)
+
+    if sys.platform == "win32" and not isinstance(
+        event_loop, asyncio.SelectorEventLoop
+    ):
+        # Required by twisted on windows
+        event_loop = asyncio.SelectorEventLoop()
+
+    asyncio.set_event_loop(event_loop)
+
     return event_loop
 
 
