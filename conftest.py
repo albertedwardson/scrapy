@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import pytest
 from twisted.web.http import H2_ENABLED
 
-from scrapy.utils.reactor import set_asyncio_event_loop_policy
 from scrapy.utils.reactorless import install_reactor_import_hook
 from tests.keys import generate_keys
 from tests.mockserver.http import MockServer
@@ -81,11 +80,7 @@ def reactor_pytest(request) -> str:
 
 
 def pytest_configure(config):
-    if config.getoption("--reactor") == "asyncio":
-        # Needed on Windows to switch from proactor to selector for Twisted reactor compatibility.
-        # If we decide to run tests with both, we will need to add a new option and check it here.
-        set_asyncio_event_loop_policy()
-    elif config.getoption("--reactor") == "none":
+    if config.getoption("--reactor") == "none":
         install_reactor_import_hook()
 
 
