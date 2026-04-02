@@ -92,26 +92,12 @@ class CallLaterOnce(Generic[_T]):
 _asyncio_reactor_path = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 
-def set_asyncio_event_loop_policy() -> None:
-    """The policy functions from asyncio often behave unexpectedly,
-    so we restrict their use to the absolutely essential case.
-    This should only be used to install the reactor.
-    """
-    policy = asyncio.get_event_loop_policy()
-    if sys.platform == "win32" and not isinstance(
-        policy, asyncio.WindowsSelectorEventLoopPolicy
-    ):
-        policy = asyncio.WindowsSelectorEventLoopPolicy()
-        asyncio.set_event_loop_policy(policy)
-
-
 def install_reactor(reactor_path: str, event_loop_path: str | None = None) -> None:
     """Installs the :mod:`~twisted.internet.reactor` with the specified
     import path. Also installs the asyncio event loop with the specified import
     path if the asyncio reactor is enabled"""
     reactor_class = load_object(reactor_path)
     if reactor_class is asyncioreactor.AsyncioSelectorReactor:
-        set_asyncio_event_loop_policy()
         with suppress(error.ReactorAlreadyInstalledError):
             event_loop = set_asyncio_event_loop(event_loop_path)
             asyncioreactor.install(eventloop=event_loop)
@@ -127,6 +113,9 @@ def _get_asyncio_event_loop() -> AbstractEventLoop:
     return set_asyncio_event_loop(None)
 
 
+def _new_event_loop() -> AbstractEventLoop:
+    return asyncio.SelectorEventLoop() if sys.platform == "win32" else asyncio.new_event_loop()
+
 def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
     """Sets and returns the event loop with specified import path."""
     if event_loop_path is not None:
@@ -134,7 +123,6 @@ def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
         event_loop = _get_asyncio_event_loop()
         if not isinstance(event_loop, event_loop_class):
             event_loop = event_loop_class()
-            asyncio.set_event_loop(event_loop)
     else:
         try:
             with catch_warnings():
@@ -149,14 +137,16 @@ def set_asyncio_event_loop(event_loop_path: str | None) -> AbstractEventLoop:
                     message="There is no current event loop",
                     category=DeprecationWarning,
                 )
-                event_loop = asyncio.get_event_loop()
+                event_loop = _new_event_loop()
         except RuntimeError:
             # `get_event_loop` raises RuntimeError when called with no asyncio
             # event loop yet installed in the following scenarios:
             # - Previsibly on Python 3.14 and later.
             #   https://github.com/python/cpython/issues/100160#issuecomment-1345581902
-            event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(event_loop)
+            event_loop = _new_event_loop()
+
+    asyncio.set_event_loop(event_loop)
+
     return event_loop
 
 
